@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Симметричный кроссворд</title>
+    <!-- Подключаем шрифт Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --cell-size: 40px;
+            --border-color: #7d7d7d;
+            --background-color: #f4f4f4;
+            --active-color: #cceeff;
+            --correct-color: #b8f5b8;
+            --incorrect-color: #fdbfbf;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
+
+        .crossword-container {
+            width: 100%;
+            max-width: 900px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            padding: 25px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            color: #111;
+            margin-top: 0;
+            margin-bottom: 25px;
+        }
+
+        /* --- Контейнер пазла --- */
+        .puzzle-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Центрируем все ряды */
+            gap: 10px;
+            margin-bottom: 25px;
+            overflow-x: auto; /* Для мобильных, если слова очень длинные */
+        }
+        
+        .word-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            justify-content: center; /* Центрируем содержимое ряда */
+            flex-wrap: nowrap; /* Запрещаем перенос строки */
+            min-height: var(--cell-size);
+        }
+        
+        .word-number {
+            font-weight: 700;
+            color: #555;
+            margin-right: 10px;
+        }
+
+        .input-container {
+            display: flex;
+            flex-shrink: 0; /* Запрещаем сжатие инпутов */
+        }
+
+        .cell-input {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            padding: 0;
+            margin: 0;
+            border: 1px solid var(--border-color);
+            margin-left: -1px; /* Эффект общей границы */
+            box-sizing: border-box;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            background-color: #fff;
+            color: #000;
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+        
+        .input-container .cell-input:first-child {
+            margin-left: 0;
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+        }
+        .input-container .cell-input:last-child {
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+        }
+
+        .cell-input::-webkit-outer-spin-button,
+        .cell-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .cell-input:focus {
+            outline: 2px solid var(--active-color);
+            z-index: 1;
+            position: relative; /* Чтобы outline был виден поверх */
+        }
+
+        /* Динамические классы */
+        .cell-input.correct {
+            background-color: var(--correct-color);
+            border-color: #0a880a;
+        }
+        .cell-input.incorrect {
+            background-color: var(--incorrect-color);
+            border-color: #d12020;
+        }
+
+        .word-clue {
+            margin-left: 15px;
+            font-size: 0.9rem;
+            color: #444;
+            flex-shrink: 1; /* Позволяем подсказке сжиматься */
+            min-width: 150px; /* Минимальная ширина для подсказки */
+        }
+        
+        /* Стили для ссылок в вопросах */
+        .word-clue a {
+            font-weight: 500;
+            text-decoration: none;
+            color: #0056b3;
+        }
+        .word-clue a:hover {
+            text-decoration: underline;
+        }
+
+
+        /* --- Управление --- */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #check-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #check-button:hover {
+            background-color: #45a049;
+        }
+
+        #clear-button {
+            background-color: #f44336;
+            color: white;
+        }
+        #clear-button:hover {
+            background-color: #d32f2f;
+        }
+        
+        #message-box {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: 500;
+            font-size: 1.1rem;
+            color: #4CAF50;
+            min-height: 20px; /* Резервируем место */
+        }
+
+        /* --- Адаптивность --- */
+        @media (max-width: 800px) {
+            .word-row {
+                /* На мобильных устройствах центрирование может сломаться,
+                   поэтому выравниваем по левому краю */
+                justify-content: flex-start;
+            }
+            .word-clue {
+                /* Переносим подсказку под инпуты, чтобы сэкономить место */
+                display: block;
+                width: 100%;
+                margin-left: 0;
+                margin-top: 5px;
+                text-align: center; /* Центрируем подсказку под ячейками */
+            }
+            .word-row {
+                flex-wrap: wrap; /* Разрешаем перенос */
+                margin-bottom: 20px;
+            }
+            .puzzle-container {
+                align-items: center; /* Центрируем ряды слов */
+            }
+            .input-container {
+                 /* Центрируем инпуты, когда подсказка ушла вниз */
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .word-number {
+                 /* Центрируем номер */
+                width: 100%;
+                text-align: center;
+                margin: 0 0 5px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crossword-container">
+        <h1>Кроссворд: <a href="https://www.youtube.com/watch?v=qKJh0S4w8sY">Связи многомерных структур человека</a></h1>
+        <div class="puzzle-container" id="puzzle-container">
+            <!-- Ряды слов будут сгенерированы JavaScript -->
+        </div>
+
+        <div class="controls">
+            <button id="check-button">Проверить</button>
+            <button id="clear-button">Очистить</button>
+        </div>
+
+        <div id="message-box">
+        <div id="message-box">
+            <H2>Видео на Bastyon</H2>
+        <iframe width="640" style="aspect-ratio:1.7770833333333333" src="https://bastyon.com/embedVideo.php?embed=true&s=6c7c385211dd9e02f01a3f5f3999e2daa8a7e4df215afd78cdfe7b09942d3ab3&host=peertube322.pocketnet.app&id=fbcf9741-17ce-4570-ae3a-529199718ddb" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const videoUrlBase = 'https://www.youtube.com/watch?v=qKJh0S4w8sY&t=';
+            
+            // 1. Данные пазла (упрощенная структура)
+            const puzzleData = [
+                { id: 1, number: 1, answer: 'СОЗНАНИЕ', clue: `Проявление души и духа на физике. (<a href="${videoUrlBase}1353s" target="_blank">22:33</a>)` },
+                { id: 2, number: 2, answer: 'СЛОВО', clue: `Звуковая программа или "ярлык". (<a href="${videoUrlBase}1742s" target="_blank">29:02</a>)` },
+                { id: 3, number: 3, answer: 'АТОМ', clue: `Упорядоченная совокупность частичек. (<a href="${videoUrlBase}2652s" target="_blank">44:12</a>)` },
+                { id: 4, number: 4, answer: 'ЗВУК', clue: `Основа движения в нашей реальности. (<a href="${videoUrlBase}1683s" target="_blank">28:03</a>)` },
+                { id: 5, number: 5, answer: 'ИСТОК', clue: `Изначальная точка. (<a href="${videoUrlBase}424s" target="_blank">07:04</a>)` },
+                { id: 6, number: 6, answer: 'ОРГАН', clue: `Совокупность клеток, болеющая из-за вибраций. (<a href="${videoUrlBase}2694s" target="_blank">44:54</a>)` },
+                { id: 7, number: 7, answer: 'МАТРЁШКА', clue: `Принцип "вложенности" и повторения структур. (<a href="${videoUrlBase}20s" target="_blank">00:20</a>)` }
+            ];
+
+            const puzzleContainer = document.getElementById('puzzle-container');
+            const checkButton = document.getElementById('check-button');
+            const clearButton = document.getElementById('clear-button');
+            const messageBox = document.getElementById('message-box');
+
+            // Вспомогательный объект для хранения ссылок на input-элементы
+            // Структура: { 1: [input1, input2, ...], 2: [inputA, inputB, ...] }
+            const wordInputs = {};
+
+            // 2. Генерация пазла
+            function createPuzzle() {
+                puzzleData.forEach(word => {
+                    const { id, number, answer, clue } = word;
+                    
+                    wordInputs[id] = []; // Инициализируем массив для инпутов этого слова
+                    
+                    const wordRow = document.createElement('div');
+                    wordRow.className = 'word-row';
+                    
+                    const wordNumber = document.createElement('span');
+                    wordNumber.className = 'word-number';
+                    wordNumber.textContent = `${number}.`;
+                    
+                    const inputContainer = document.createElement('div');
+                    inputContainer.className = 'input-container';
+                    inputContainer.dataset.id = id;
+                    
+                    // Создаем ячейки для слова
+                    for (let i = 0; i < answer.length; i++) {
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.maxLength = 1;
+                        input.className = 'cell-input';
+                        input.dataset.id = id; // ID слова
+                        input.dataset.index = i; // Индекс буквы в слове
+                        
+                        inputContainer.appendChild(input);
+                        wordInputs[id].push(input); // Сохраняем ссылку на input
+                    }
+                    
+                    const wordClue = document.createElement('span');
+                    wordClue.className = 'word-clue';
+                    wordClue.innerHTML = clue; // Используем innerHTML для рендеринга ссылки
+                    
+                    wordRow.appendChild(wordNumber);
+                    wordRow.appendChild(inputContainer);
+                    wordRow.appendChild(wordClue);
+                    puzzleContainer.appendChild(wordRow);
+                });
+            }
+
+            // 3. Обработчики событий
+            
+            // Навигация с клавиатуры
+            puzzleContainer.addEventListener('keydown', e => {
+                if (!e.target.classList.contains('cell-input')) return;
+
+                const id = parseInt(e.target.dataset.id);
+                const index = parseInt(e.target.dataset.index);
+                const currentWordInputs = wordInputs[id];
+
+                let nextInput = null;
+
+                switch (e.key) {
+                    case 'ArrowRight':
+                        if (index < currentWordInputs.length - 1) {
+                            nextInput = currentWordInputs[index + 1];
+                        }
+                        break;
+                    case 'ArrowLeft':
+                        if (index > 0) {
+                            nextInput = currentWordInputs[index - 1];
+                        }
+                        break;
+                    case 'ArrowDown':
+                        // Переход к следующему слову, в ту же колонку (по индексу)
+                        if (wordInputs[id + 1]) {
+                            nextInput = wordInputs[id + 1][index] || wordInputs[id + 1][wordInputs[id + 1].length - 1];
+                        }
+                        break;
+                    case 'ArrowUp':
+                        // Переход к предыдущему слову, в ту же колонку (по индексу)
+                        if (wordInputs[id - 1]) {
+                             nextInput = wordInputs[id - 1][index] || wordInputs[id - 1][wordInputs[id - 1].length - 1];
+                        }
+                        break;
+                    case 'Backspace':
+                        // Стираем и двигаемся назад
+                        if (e.target.value === '' && index > 0) {
+                             nextInput = currentWordInputs[index - 1];
+                        }
+                        break;
+                    case 'Enter':
+                    case 'Tab':
+                        e.preventDefault();
+                         // Переход к первому инпуту следующего слова
+                        if (wordInputs[id + 1]) {
+                            nextInput = wordInputs[id + 1][0];
+                        }
+                        break;
+                }
+
+                if (nextInput) {
+                    nextInput.focus();
+                    nextInput.select();
+                }
+            });
+            
+            // Авто-переход при вводе
+            puzzleContainer.addEventListener('input', e => {
+                if (!e.target.classList.contains('cell-input') || e.target.value === '') return;
+                
+                const id = parseInt(e.target.dataset.id);
+                const index = parseInt(e.target.dataset.index);
+                const currentWordInputs = wordInputs[id];
+
+                // Переходим к следующей ячейке в активном слове
+                if (index < currentWordInputs.length - 1) {
+                    const nextInput = currentWordInputs[index + 1];
+                    if (nextInput) {
+                        nextInput.focus();
+                        nextInput.select();
+                    }
+                }
+            });
+
+            // 4. Кнопки управления
+            
+            // Очистка
+            clearButton.addEventListener('click', () => {
+                for (const id in wordInputs) {
+                    wordInputs[id].forEach(input => {
+                        input.value = '';
+                        input.classList.remove('correct', 'incorrect');
+                    });
+                }
+                messageBox.textContent = '';
+            });
+
+            // Проверка
+            checkButton.addEventListener('click', () => {
+                let allCorrect = true;
+                let totalInputs = 0;
+                let filledInputs = 0;
+                
+                puzzleData.forEach(word => {
+                    const { id, answer } = word;
+                    const inputs = wordInputs[id];
+                    let userAnswer = '';
+                    
+                    inputs.forEach(input => {
+                        totalInputs++;
+                        if (input.value) {
+                            filledInputs++;
+                        }
+                        userAnswer += input.value.toUpperCase();
+                    });
+
+                    // Проверяем слово целиком
+                    if (userAnswer === answer) {
+                        inputs.forEach(input => {
+                            input.classList.add('correct');
+                            input.classList.remove('incorrect');
+                        });
+                    } else {
+                        // Помечаем все слово как некорректное (если оно заполнено, но неверно)
+                        if (userAnswer.length === answer.length) {
+                             inputs.forEach(input => {
+                                input.classList.add('incorrect');
+                                input.classList.remove('correct');
+                            });
+                        }
+                        allCorrect = false;
+                    }
+                });
+                
+                if (allCorrect && filledInputs === totalInputs && totalInputs > 0) {
+                    messageBox.textContent = 'Кроссворд решен верно! Поздравляем!';
+                    messageBox.style.color = '#4CAF50';
+                } else if (!allCorrect && filledInputs === totalInputs) {
+                     messageBox.textContent = 'Найдены ошибки. Попробуйте еще раз.';
+                     messageBox.style.color = '#d32f2f';
+                     setTimeout(() => { messageBox.textContent = ''; }, 3000);
+                } else if (filledInputs < totalInputs) {
+                    messageBox.textContent = 'Не все ячейки заполнены.';
+                    messageBox.style.color = '#777';
+                    setTimeout(() => { messageBox.textContent = ''; }, 3000);
+                }
+            });
+
+            // 5. Инициализация
+            createPuzzle();
+        });
+    </script>
+</body>
+</html>
